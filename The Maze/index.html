@@ -1,0 +1,478 @@
+<!doctype html> 
+<html lang="en"> 
+<head> 
+    <meta charset="UTF-8" />
+    <title>Phaser - Test</title>
+    <!--<script src="//cdn.jsdelivr.net/phaser/2.2.2/phaser.min.js"></script>-->
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+    <script src = "phaser.min.js"></script>
+    <script src="fields.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+<body style="background-color: black">
+    <h3 style="color: white; top: 10px; left: 10px;" id='time'>0</h3>
+    <br><br><br><br>
+    <div id="gameScreen" style='margin-left: auto; margin-right: auto; width: 640px; height: 480px;'></div>
+    <br><br>
+<script type="text/javascript">
+
+var game = new Phaser.Game(640, 640, Phaser.AUTO, 'gameScreen', { preload: preload, create: create, update: update });
+
+function preload() {
+
+    this.preloadBar = game.add.graphics(0, 50);
+    this.preloadBar.lineStyle(3, 0xffffff, 1);
+    this.preloadBar.moveTo(0, 0);
+    this.preloadBar.lineTo(game.width, 0);
+    this.preloadBar.scale.x = 0; // set the bar to the beginning position
+
+    game.load.tilemap('TeleporterFields', 'images/TeleporterFields2.json', null, Phaser.Tilemap.TILED_JSON);
+    game.load.image('tiles1', 'images/white.png');
+    game.load.image('tiles2', 'images/SnowyTrees3.png');
+    game.load.image('tiles3', 'images/teleporters2.png');
+    game.load.image('key', 'images/key.png');
+    game.load.image('gate', 'images/gate2.png');
+    game.load.spritesheet('characterAnimations', 'images/spritesheetsmall.png', 32, 52);
+    game.load.audio('teleport', 'sounds/teleport.wav');
+    game.load.audio('mainTrack', 'sounds/SnowMayNeverEnd.ogg');
+}
+
+function loadUpdate() {
+  // every frame during loading, set the scale.x of the bar to the progress (an integer between 0
+  // and 100) divided by 100 to give a float between 0 and 1
+  this.preloadBar.scale.x = game.load.progress * 0.01;
+}
+
+var map;
+var sprite;
+var layer;
+var teleportLayer;
+var key;
+var gate;
+var cursors;
+var trees;
+var currentField;
+var teleportSound;
+var mainTrack;
+var playerHasKey;
+
+//For testing purposes
+
+var time = document.getElementById('time');
+var seconds = 0;
+
+setInterval(function(){
+    time.innerHTML = seconds += 1;;
+}, 1000);
+
+//End for testing purposes
+
+function create() {
+
+    game.physics.startSystem(Phaser.Physics.ARCADE);
+
+    game.world.setBounds(0, 0, 3840, 3200);
+
+    map = game.add.tilemap('TeleporterFields');
+    map.addTilesetImage('Snow', 'tiles1');
+    map.addTilesetImage('Trees', 'tiles2');
+    map.addTilesetImage('Teleporters', 'tiles3');
+
+    layer = map.createLayer('Snow');
+    layer = map.createLayer('Trees');
+    teleportLayer = map.createLayer('Teleporters');
+
+    teleportSound = game.add.audio('teleport');
+    teleportSound.volume = 0.01;
+
+    mainTrack = game.add.audio('mainTrack');
+    //mainTrack.volume = 0.2;
+    mainTrack.loopFull(0.8);
+
+    key = game.add.sprite(1414, 262, 'key');
+    game.physics.arcade.enable(key);
+    key.body.immovable = true;
+
+    gate = game.add.sprite(3328, 1856, 'gate');
+    game.physics.arcade.enable(gate);
+    gate.body.immovable = true;
+
+    map.setCollisionBetween(2, 5, true, 'Trees');
+    map.setCollisionBetween(6, 13, true, teleportLayer);
+
+    //map.setTileIndexCallback(1, stopMoving, this);
+
+    currentField = field0;
+    sprite = game.add.sprite(3328, 2112, 'characterAnimations');
+    game.physics.arcade.enable(sprite);
+    sprite.body.collideWorldBounds = true;
+    sprite.animations.add('right', [28, 29, 30, 31, 32, 33, 34, 35], 10, true);
+    sprite.animations.add('left', [10, 11, 12, 13, 14, 15, 16, 17], 10, true);
+    sprite.animations.add('up', [1, 2, 3, 4, 5, 6, 7, 8], 10, true);
+    sprite.animations.add('down', [19, 20, 21, 22, 23, 24, 25, 26], 10, true);
+
+    cursors = game.input.keyboard.createCursorKeys();
+    game.camera.follow(sprite);
+
+    //addEventListener("keydown", spaceBarHandle);
+
+    sprite.lastDirection = 'up';
+}
+
+function update() {
+
+    game.physics.arcade.collide(sprite, layer);
+    game.physics.arcade.collide(sprite, teleportLayer, teleporterHit);
+    game.physics.arcade.collide(sprite, key, keyHit);
+    game.physics.arcade.collide(sprite, gate, gateHit);
+    game.camera.view.offset(16, 6);
+
+    sprite.body.velocity.x = 0;
+    sprite.body.velocity.y = 0;
+
+    if (cursors.left.isDown && sprite.body.velocity.y == 0)
+    {
+        //  Move to the left
+        sprite.body.velocity.x = -96;
+        //sprite.position.x -= 6;
+
+        sprite.animations.play('left');
+        sprite.lastDirection = 'left';
+    }
+    else if (cursors.right.isDown && sprite.body.velocity.y == 0)
+    {
+        //  Move to the right
+        sprite.body.velocity.x = 96;
+        //sprite.position.x += 6;
+
+        sprite.animations.play('right');
+        sprite.lastDirection = 'right';
+    }
+    else if (cursors.up.isDown && sprite.body.velocity.x == 0)
+    {
+        sprite.body.velocity.y = -96;
+        //sprite.position.y -= 6;
+
+        sprite.animations.play('up');
+        sprite.lastDirection = 'up';
+    }
+    else if (cursors.down.isDown && sprite.body.velocity.x == 0)
+    {
+        sprite.body.velocity.y = 96;
+        //sprite.position.y +=6;
+
+        sprite.animations.play('down');
+        sprite.lastDirection = 'down';
+    }
+    else
+    {
+        sprite.animations.stop();
+        if(sprite.lastDirection == 'left')
+        {
+            sprite.frame = 9;
+        }
+        else if(sprite.lastDirection == 'right')
+        {
+            sprite.frame = 27;
+        }
+        else if(sprite.lastDirection == 'up')
+        {
+            sprite.frame = 0;
+        }
+        else
+        {
+            sprite.frame = 18;
+        }
+    }
+
+    // if (game.input.keyboard.isDown(Phaser.Keyboard.SPACEBAR))
+    // {
+    //     if(sprite.key == 'characterAnimations')
+    //         ghost();
+    //     else
+    //         human();
+    // }
+    // else
+    // {
+    //     sprite.animations.stop();
+    // }
+    // else if(Math.round(sprite.body.position.x) % 48 == 0 && Math.round(sprite.body.position.y) % 48 == 0)
+    // {
+    //     sprite.body.velocity.x = 0;
+    //     sprite.body.velocity.y = 0;
+    //     sprite.body.position.x = Math.round(sprite.body.position.x);
+    //     sprite.body.position.y = Math.round(sprite.body.position.y);
+    //     sprite.animations.stop();
+    // }
+}
+
+function spaceBarHandle(e)
+{
+    if(e.which == Phaser.Keyboard.SPACEBAR)
+    {
+        if(sprite.key == 'characterAnimations')
+            ghost();
+        else
+            human();
+    }
+}
+
+function ghost()
+{
+    var positionX = sprite.position.x;
+    var positionY = sprite.position.y;
+    sprite.destroy();
+    sprite = game.add.sprite(positionX, positionY, 'ghostAnimations');
+    sprite.animations.add('shine', [0, 1, 2, 3, 2, 1], 5, true);
+    game.physics.arcade.enable(sprite);
+    sprite.body.collideWorldBounds = true;
+    map.setCollisionBetween(19, 22, false, 'Trees');
+    game.camera.follow(sprite);
+}
+
+function human()
+{
+    var positionX = sprite.position.x;
+    var positionY = sprite.position.y;
+    sprite.destroy();
+    sprite = game.add.sprite(positionX, positionY, 'characterAnimations');
+    game.physics.arcade.enable(sprite);
+    sprite.body.collideWorldBounds = true;
+    sprite.animations.add('right', [28, 29, 30, 31, 32, 33, 34, 35], 10, true);
+    sprite.animations.add('left', [10, 11, 12, 13, 14, 15, 16, 17], 10, true);
+    sprite.animations.add('up', [1, 2, 3, 4, 5, 6, 7, 8], 10, true);
+    sprite.animations.add('down', [19, 20, 21, 22, 23, 24, 25, 26], 10, true);
+
+    map.setCollisionBetween(19, 22, true, 'Trees');
+    game.camera.follow(sprite);
+}
+
+function teleporterHit(obj1, obj2)
+{
+    console.log('transport');
+    teleportSound.play();
+    if(currentField.name == "field0")
+    {
+        if(sprite.position.x < 1344) //went left
+        {
+            currentField = getField(currentField.left);
+        }
+        else if(sprite.position.x > 1472) //went right
+        {
+            currentField = getField(currentField.right);
+        }
+        else if(sprite.position.y < 2752) //went up
+        {
+            currentField = getField(currentField.up);
+        }
+    }
+    else if(currentField.name == "field1")
+    {
+        if(sprite.position.x < 448) 
+        {
+            currentField = getField(currentField.left);
+        }
+        else if(sprite.position.x > 512)
+        {
+            currentField = getField(currentField.right);
+        }
+        else if(sprite.position.y < 1664)
+        {
+            currentField = getField(currentField.up);
+        }
+        else
+        {
+            currentField = getField(currentField.down);
+        }
+    }
+    else if(currentField.name == "field2")
+    {
+        if(sprite.position.x < 1344) //went left
+        {
+            currentField = getField(currentField.left);
+        }
+        else if(sprite.position.x > 1472) //went right
+        {
+            currentField = getField(currentField.right);
+        }
+        else if(sprite.position.y < 1664)
+        {
+            currentField = getField(currentField.up);
+        }
+        else
+        {
+            currentField = getField(currentField.down);
+        }
+    }
+    else if(currentField.name == "field3")
+    {
+        if(sprite.position.x < 2304)
+        {
+            currentField = getField(currentField.left);
+        }
+        else if(sprite.position.x > 2432)
+        {
+            currentField = getField(currentField.right);
+        }
+        else if(sprite.position.y < 1664)
+        {
+            currentField = getField(currentField.up);
+        }
+        else
+        {
+            currentField = getField(currentField.down);
+        }
+    }
+    else if(currentField.name == "field4")
+    {
+        if(sprite.position.x < 448) 
+        {
+            currentField = getField(currentField.left);
+        }
+        else if(sprite.position.x > 512)
+        {
+            currentField = getField(currentField.right);
+        }
+        else if(sprite.position.y < 1024)
+        {
+            currentField = getField(currentField.up);
+        }
+        else
+        {
+            currentField = getField(currentField.down);
+        }
+    }
+    else if(currentField.name == "field5")
+    {
+        if(sprite.position.x < 1344) //went left
+        {
+            currentField = getField(currentField.left);
+        }
+        else if(sprite.position.x > 1472) //went right
+        {
+            currentField = getField(currentField.right);
+        }
+        else if(sprite.position.y < 1024)
+        {
+            currentField = getField(currentField.up);
+        }
+        else
+        {
+            currentField = getField(currentField.down);
+        }
+    }
+    else if(currentField.name == "field6")
+    {
+        if(sprite.position.x < 2304)
+        {
+            currentField = getField(currentField.left);
+        }
+        else if(sprite.position.x > 2432)
+        {
+            currentField = getField(currentField.right);
+        }
+        else if(sprite.position.y < 1024)
+        {
+            currentField = getField(currentField.up);
+        }
+        else
+        {
+            currentField = getField(currentField.down);
+        }
+    }
+    else if(currentField.name == "field7")
+    {
+        currentField = getField(currentField.down);
+    }
+
+    sprite.position.x = currentField.center.x;
+    sprite.position.y = currentField.center.y;
+
+    if(currentField.name == "field0" && playerHasKey)
+    {
+        console.log('Game Over');
+    }
+
+    /*
+    if(sprite.position.x >= 416) //player went through right teleporter
+    {
+        map.destroy();
+        //map = game.add.tilemap('emptyField');
+        sprite.position.x = 256;
+        sprite.position.y = 256;
+    }
+    else if(sprite.position.x <= 128) //player went through left teleporter
+    {
+
+    }
+    else if(sprite.position.y <= 128) //player went through top teleporter
+    {
+
+    }
+    else //player went through bottom teleporter
+    {
+
+    }*/
+}
+
+function getField(num)
+{
+    if(num == 0)
+    {
+        return field0;
+    }
+    else if(num == 1)
+    {
+        return field1;
+    }
+    else if(num == 2)
+    {
+        return field2;
+    }
+    else if(num == 3)
+    {
+        return field3;
+    }
+    else if(num == 4)
+    {
+        return field4;
+    }
+    else if(num == 5)
+    {
+        return field5;
+    }
+    else if(num == 6)
+    {
+        return field6;
+    }
+    else if(num == 7)
+    {
+        return field7;
+    }
+}
+
+function keyHit(obj1, obj2)
+{
+    console.log('keyHit');
+    key.destroy();
+
+    playerHasKey = true;
+}
+
+function gateHit(obj1, obj2)
+{
+    if(playerHasKey)
+    {
+        gate.destroy();
+        setTimeout(function(){game.destroy();}, 1000);
+    }
+}
+
+</script>
+
+</body>
+</html>
